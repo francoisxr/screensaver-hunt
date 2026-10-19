@@ -375,3 +375,14 @@ test('moire centre: the scene moves it along with the frames', () => {
   const after = scene.background.moireCentre()
   assert.ok(Math.hypot(after[0] - before[0], after[1] - before[1]) > 3, 'it moved in 10 seconds')
 })
+
+test('life: a ring of flies lies between its two radii and leaves the middle empty', () => {
+  const life = empty(80, 40)
+  life.ring(40, 20, 8, 10, 1, 0.5)
+  const cells = cellsOf(life)
+  assert.ok(cells.length > 50)
+  for (const [x, y] of cells) {
+    const d = Math.hypot((x - 40) * 0.5, y - 20)
+    assert.ok(d >= 7.5 && d <= 10.5, `a fly at distance ${d.toFixed(1)}`)
+  }
+})

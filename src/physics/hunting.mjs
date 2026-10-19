@@ -22,7 +22,7 @@ export function planHunts (world, bodies) {
   for (const s of bodies) s.prey = null
   if (hunting.accel <= 0) return
 
-  const hunters = bodies.filter(s => s.sickUntil === 0 && !s.anim && !s.entering && !s.leaving)
+  const hunters = bodies.filter(s => s.sickUntil === 0 && world.t >= s.calmUntil && !s.anim && !s.entering && !s.leaving)
   const offers = new Map() // hunter id -> [{ c, drive, d }]
   for (const c of world.cookies) {
     const ranked = hunters

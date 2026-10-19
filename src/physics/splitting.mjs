@@ -60,7 +60,10 @@ export function startSplit (world, p) {
   const anim = { type: 'split', parent: p, pieces: list, t0: world.t, dur: splitting.seconds, offs, mass0, finals, p: 0, e: 0 }
   for (const s of list) s.anim = anim
   p.mass = total // the parent's body carries all the pieces' mass until they separate
-  world.log('split', { parent: p.id, pieces: list.map(s => s.id), masses: finals.map(m => +m.toFixed(2)) })
+  p.stalkId = 0 // it drops its chase (and nobody can chase it: see canMerge)
+  p.hunt = null
+  p.pounce = false
+  world.log('split', { x: p.x, y: p.y, parent: p.id, pieces: list.map(s => s.id), masses: finals.map(m => +m.toFixed(2)) })
 }
 
 /**
@@ -134,13 +137,15 @@ export function finishSplit (world, anim) {
     s.alpha = 1
     s.mass = finals[i]
     s.drawMass = finals[i]
-    s.immuneUntil = world.t + merging.immunity
+    s.flare = 1
+    s.calmUntil = world.t + splitting.calmSeconds
+    s.immuneUntil = Math.max(world.t + merging.immunity, s.calmUntil) // nobody chases a piece while it lies low
     const len = Math.hypot(offs[i][0], offs[i][1]) || 1
     const speed = world.rng.range(splitting.releaseSpeed)
     s.vx = vx + offs[i][0] / len * speed
     s.vy = vy + offs[i][1] / len * speed
   })
-  world.log('split-done', { parent: parent.id })
+  world.log('split-done', { parent: parent.id, x: cx, y: cy })
   pruneContacts(world)
 }
 

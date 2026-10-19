@@ -26,6 +26,7 @@ const RIM_GAP_SHARE = 0.45      // of the cells that go, this share become blank
 const SPECK_INNER = 0.95        // specks drift outside the rim between these shares of the radius
 const SPECK_OUTER = 1.15
 const SPECK_CHANCE = 0.14
+const FLARE_REACH = 0.4         // a flare throws specks this much further out (share of the radius)
 const STRETCH_FROM = 6          // a hunter stretches from this speed (units/s)...
 const STRETCH_FULL = 22         // ...to its full stretch at this speed
 const WOBBLE_FULL_SPEED = 30    // speed at which the speed-dependent ripple is at its maximum
@@ -114,7 +115,8 @@ function drawHunter (grid, sp, input, scratch, offCol = 0, offRow = 0) {
   const res = input.dishFrame(sp.id)
   if (!res || sp.alpha < MIN_ALPHA) return
 
-  const fuzz = sp.fuzz
+  const flare = sp.flare ?? 0
+  const fuzz = Math.max(sp.fuzz, flare) // a released piece sheds specks like a sick one, for a moment
   // Where the body is centred: on a cell boundary, decided by the hunter's position alone. (Not by the dish
   // window, whose size is a whole number of cells that keeps changing while the hunter grows or shrinks:
   // the body would shift by half a cell each time.) Its size comes from the hunter's exact size for the
@@ -138,7 +140,7 @@ function drawHunter (grid, sp, input, scratch, offCol = 0, offRow = 0) {
   const ux = speed > 1e-6 ? sp.vx / speed : 1
   const uy = speed > 1e-6 ? sp.vy / speed : 0
 
-  const halfRows = Math.ceil((body.maxReach * S + 0.3) * radius) + 1
+  const halfRows = Math.ceil((body.maxReach * S + 0.3 + 0.5 * flare) * radius) + 1
   const halfCols = Math.ceil(halfRows / aspect) + 1
   const cx = res.cols / 2
   const cy = res.rows / 2
@@ -166,7 +168,7 @@ function drawHunter (grid, sp, input, scratch, offCol = 0, offRow = 0) {
       if (ch === ' ' && fuzz < FUZZ_MIN) continue
       if (sp.alpha < 1 && cellHash(sx + screen.col0 - centreCol, sy - centreRow, sp.id) > sp.alpha) continue // fading in or dissolving, cell by cell
 
-      if (fuzz > FUZZ_MIN) ch = fray(ch, 1 + RIM_PER_RADIUS * f, fuzz, look.fuzz, rng)
+      if (fuzz > FUZZ_MIN) ch = fray(ch, 1 + RIM_PER_RADIUS * f, fuzz, look.fuzz, rng, flare)
       if (ch === ' ') continue
       grid[sx + sy * screen.cols] = res.colors && idx >= 0
         ? { char: ch, color: res.colors[idx], back: res.backs[idx] }
@@ -179,12 +181,12 @@ function drawHunter (grid, sp, input, scratch, offCol = 0, offRow = 0) {
  * The frayed edge of a sick hunter: cells near the rim drop out or turn into specks, and specks
  * drift just outside it. `rho` is the distance from the centre as a share of the dish radius.
  */
-function fray (ch, rho, fuzz, specks, rng) {
+function fray (ch, rho, fuzz, specks, rng, flare = 0) {
   if (ch !== ' ') {
     if (rho > RIM_START && rng.random() < (rho - RIM_START) / RIM_WIDTH * RIM_STRENGTH * fuzz) {
       return rng.random() < RIM_GAP_SHARE ? ' ' : specks[Math.floor(rng.random() * specks.length)]
     }
-  } else if (rho > SPECK_INNER && rho < SPECK_OUTER && rng.random() < SPECK_CHANCE * fuzz) {
+  } else if (rho > SPECK_INNER && rho < SPECK_OUTER + FLARE_REACH * flare && rng.random() < SPECK_CHANCE * (1 + 2 * flare) * fuzz) {
     return specks[Math.floor(rng.random() * specks.length)]
   }
   return ch

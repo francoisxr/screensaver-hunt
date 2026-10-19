@@ -84,6 +84,11 @@ export class Background {
     this.life.burst(col, row, radius, density, aspect)
   }
 
+  /** Sends a ring of new flies out from a point (column, row): between `inner` and `outer` rows away. */
+  stirRing (col, row, inner, outer, density, aspect) {
+    this.life.ring(col, row, inner, outer, density, aspect)
+  }
+
   /**
    * The background cell at a column and row of the combined area.
    * @param {number} seconds scene time
