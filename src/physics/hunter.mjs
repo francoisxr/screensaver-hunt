@@ -15,6 +15,7 @@ import { TAU } from '../core/math.mjs'
  * @property {number} ang           heading of its random drift
  * @property {number} mass          in base masses; its area. Radius = r0 * sqrt(mass)
  * @property {number} sickUntil     0, or the time its sickness ends (then it splits)
+ * @property {number} calmUntil     after a burst it lies low (brakes, does not hunt) until this time
  * @property {number} immuneUntil   it cannot merge before this time
  * @property {number} kickIn        seconds until its next sick jolt
  * @property {number} agit          how agitated it moves, 0..1 (follows sickness, lets go slowly)
@@ -40,6 +41,7 @@ import { TAU } from '../core/math.mjs'
  * @property {number} drawMass      the size it is drawn at
  * @property {number} alpha         how solid it is, 0..1
  * @property {number} fuzz          how frayed its edge is, 0..1
+ * @property {number} flare         a burst of shed specks around it, 0..1, dying away (set when a split releases a piece)
  */
 
 /**
@@ -58,6 +60,7 @@ export function createHunter (world, x, y, mass) {
     ang: world.rng.float(0, TAU),
     mass,
     sickUntil: 0,
+    calmUntil: 0,
     immuneUntil: 0,
     kickIn: 0,
     agit: 0,
@@ -82,6 +85,7 @@ export function createHunter (world, x, y, mass) {
     drawMass: mass,
     alpha: 1,
     fuzz: 0,
+    flare: 0,
   }
 }
 

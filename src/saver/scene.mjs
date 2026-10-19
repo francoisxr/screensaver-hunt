@@ -4,7 +4,7 @@
 // WorkerPool, wired up in scene-main.mjs), which keeps it testable.
 
 import { World } from '../physics/world.mjs'
-import { screenCorners } from '../physics/layout.mjs'
+import { screenCorners, screenCentres } from '../physics/layout.mjs'
 import { createRng } from '../core/rng.mjs'
 import { gridToAnsi } from '../core/frame.mjs'
 import { BINS } from '../render/wobble.mjs'
@@ -48,6 +48,7 @@ export class Scene {
     this.baseRows = MIN_BASE_ROWS
     this.layoutKey = ''
     this.scratch = new Float32Array(BINS)
+    this.splitSteps = new WeakMap() // split animation -> how many rings of flies it has sent so far
     this.neckCells = 0 // how many neck cells have been drawn so far (for the debug log)
   }
 
@@ -73,6 +74,7 @@ export class Scene {
     world.step(dt * runtime.speed)
     this.animator.update(world.cookies, world.bodies(), s => world.radius(s), dt, timeMs, look.cookies.shape, (a, b) => world.distance(a, b))
 
+    this.stirSplits()
     this.dishes.sync(world.hunters, this.baseRows)
     this.dishes.dispatch(timeMs, this.aspect)
 
@@ -119,19 +121,45 @@ export class Scene {
     this.layoutKey = key
     this.totalCols = totalCols
     this.rows = rows
-    this.world.setSpace(areaW, rows, r0, screenCorners(screens, this.aspect, rows))
+    this.world.setSpace(areaW, rows, r0, screenCorners(screens, this.aspect, rows), screenCentres(screens, this.aspect, rows))
     this.log(`layout ${key} area ${areaW.toFixed(0)}x${rows} r0=${r0.toFixed(1)}`)
   }
 
   /** Merges and splits stir the flies of the background where they happen. */
   stirBackground (event) {
-    if (!this.background || (event.type !== 'merge' && event.type !== 'split')) return
+    if (!this.background) return
     const { world } = this
+    if (event.type === 'split-done') { // the pop: a wide ring of flies flung out from where the pieces part
+      const { pop } = this.config.look.background.life.splitRings
+      const piece = world.hunters.find(s => s.id === event.parent)
+      if (!piece) return
+      const reach = world.radius(piece) * pop.reach
+      this.background.stirRing((event.x ?? piece.x) / this.aspect, event.y ?? piece.y, Math.max(0, reach - pop.width), reach, pop.density, this.aspect)
+      return
+    }
+    if (event.type !== 'merge' && event.type !== 'split') return
     const hunter = world.hunters.find(s => s.id === (event.keep ?? event.parent))
     if (!hunter) return
     const { life } = this.config.look.background
     const burst = event.type === 'merge' ? life.mergeBurst : life.splitBurst
     this.background.stir(hunter.x / this.aspect, hunter.y, world.radius(hunter) * burst.radius, burst.density, this.aspect)
+  }
+
+  /** While a hunter splits, rings of flies spread out from it, keeping pace with the pieces parting. */
+  stirSplits () {
+    if (!this.background) return
+    const { world } = this
+    const { steps, width, density } = this.config.look.background.life.splitRings
+    for (const s of world.hunters) {
+      const a = s.anim
+      if (!a || a.type !== 'split' || a.parent !== s) continue
+      const done = this.splitSteps.get(a) ?? 0
+      const due = Math.min(steps, Math.floor(a.p * steps) + 1)
+      if (due <= done) continue
+      this.splitSteps.set(a, due)
+      const reach = world.radius(s) * (0.7 + 1.8 * a.e)
+      this.background.stirRing(s.x / this.aspect, s.y, Math.max(0, reach - width), reach, density, this.aspect)
+    }
   }
 
   drawScreen (screen, seconds) {

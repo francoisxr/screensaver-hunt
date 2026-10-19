@@ -109,6 +109,18 @@ export class Life {
     this.patch(col, row, radius, density, aspect)
   }
 
+  /** Brings a ring of cells to life at random: between `inner` and `outer` rows from (col, row). */
+  ring (col, row, inner, outer, density, aspect) {
+    const reach = Math.ceil(outer / aspect)
+    for (let dy = -Math.ceil(outer); dy <= Math.ceil(outer); dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const d = Math.hypot(dx * aspect, dy)
+        if (d < inner || d > outer || !this.rng.chance(density)) continue
+        this.set(Math.round(col) + dx, Math.round(row) + dy)
+      }
+    }
+  }
+
   /** Random live cells inside a disc around (col, row). `size` is the radius in rows. */
   patch (col, row, size, density, aspect = 0.5) {
     const reach = Math.ceil(size / aspect)

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHunter } from '../src/physics/hunter.mjs'
 import { kickNextHunter } from '../src/physics/kicks.mjs'
-import { screenCorners } from '../src/physics/layout.mjs'
+import { screenCorners, screenCentres } from '../src/physics/layout.mjs'
 import { makeWorld, emptyWorld, run, ASPECT, ROWS, SCREENS, AREA_W } from './helpers.mjs'
 
 const snapshot = w => JSON.stringify(w.hunters.map(s => [s.id, s.x, s.y, s.vx, s.vy, s.mass, s.sickUntil]))
@@ -39,8 +39,9 @@ test('hunters never leave the area', () => {
   const world = makeWorld({}, 2)
   run(world, 120, w => {
     for (const s of w.hunters.filter(x => !x.ghost && !x.entering && !x.leaving)) { // (those walking in or out are outside on purpose)
-      // (A hunter that has just grown by eating can be a fraction inside its new limit until the next step.)
-      const hard = w.cfg.walls.hard * w.radius(s) - 0.5
+      // (A hunter that has just grown by eating can be a fraction inside its new limit until the next step, and a bounce can
+      // push it up to MAX_PUSH (0.7) past the wall.)
+      const hard = w.cfg.walls.hard * w.radius(s) - 0.75
       assert.ok(s.x >= hard && s.x <= w.w - hard, `x ${s.x} out of range`)
       assert.ok(s.y >= hard && s.y <= w.h - hard, `y ${s.y} out of range`)
     }
@@ -230,7 +231,7 @@ test('a split near a wall releases every piece inside the area, without a jump a
       s.sickUntil = 0.05
       let lastVisual = null
       let released = false
-      run(world, 4, w => {
+      run(world, world.cfg.splitting.seconds + 1, w => {
         const pieces = w.hunters
         if (!released && w.events.some(e => e.type === 'split-done')) {
           released = true
@@ -247,4 +248,72 @@ test('a split near a wall releases every piece inside the area, without a jump a
       assert.ok(released, 'the split finished')
     }
   }
+})
+
+test('a sick or bursting hunter slows right down, stops chasing, and nobody chases it', () => {
+  const world = emptyWorld({}, 3)
+  const sick = createHunter(world, 100, 22, 3.4)
+  sick.vx = 25
+  sick.sickUntil = 0.05
+  const big = createHunter(world, 130, 22, 6)
+  world.hunters.push(sick, big)
+  let fastest = 0
+  let chased = false
+  run(world, 1.5)
+  const split = world.events.find(e => e.type === 'split')
+  assert.ok(split, 'the split started')
+  assert.ok(Math.hypot(sick.vx, sick.vy) < 4, `speed ${Math.hypot(sick.vx, sick.vy).toFixed(1)} after a second of bursting`)
+  run(world, world.cfg.splitting.seconds - 2, w => {
+    fastest = Math.max(fastest, Math.hypot(sick.vx, sick.vy))
+    if (w.hunters.some(h => h.stalk?.target === sick) || sick.stalk || sick.prey) chased = true
+  })
+  assert.ok(fastest < 4, `still moving at ${fastest.toFixed(1)}`)
+  assert.ok(!chased, 'no chase while it bursts')
+})
+
+test('a sick hunter brakes before it bursts, and the pieces lie low after they part', () => {
+  const world = emptyWorld({}, 5)
+  const sick = createHunter(world, 100, 22, 3.4)
+  sick.vx = 25
+  sick.sickUntil = 4
+  world.hunters.push(sick)
+  run(world, 1)
+  assert.ok(Math.hypot(sick.vx, sick.vy) < 3, `still at ${Math.hypot(sick.vx, sick.vy).toFixed(1)} while sick`)
+  run(world, 3.2 + world.cfg.splitting.seconds + 0.2) // past the release
+  const pieces = world.hunters
+  assert.ok(pieces.length >= 2 && pieces.every(p => !p.anim))
+  run(world, 0.8) // the pop is over
+  let fastest = 0
+  run(world, world.cfg.splitting.calmSeconds - 2, () => { fastest = Math.max(fastest, ...pieces.map(p => Math.hypot(p.vx, p.vy))) })
+  assert.ok(fastest < 3, `a piece moved at ${fastest.toFixed(1)} while lying low`)
+})
+
+test('a sick hunter drifts to the centre of its nearest screen, and stays put there', () => {
+  for (const [x, y, screen] of [[20, 3, 0], [AREA_W / 2 + 30, 43, 1], [AREA_W - 10, 20, 2]]) {
+    const world = emptyWorld({}, 7)
+    world.setSpace(AREA_W, ROWS, world.r0, screenCorners(SCREENS, ASPECT, ROWS), screenCentres(SCREENS, ASPECT, ROWS))
+    const s = createHunter(world, x, y, 3.4)
+    world.hunters.push(s)
+    s.sickUntil = 12
+    const [cx, cy] = screenCentres(SCREENS, ASPECT, ROWS)[screen]
+    let top = 0
+    run(world, 10, () => { top = Math.max(top, Math.hypot(s.vx, s.vy)) })
+    assert.ok(Math.hypot(s.x - cx, s.y - cy) < 1.5, `ended ${Math.hypot(s.x - cx, s.y - cy).toFixed(1)} from the centre of screen ${screen}`)
+    assert.ok(top < 8, `drifted at ${top.toFixed(1)}`)
+  }
+})
+
+test('released pieces pop apart fast, flare, then settle down', () => {
+  const world = emptyWorld({}, 2)
+  const s = createHunter(world, 120, 22, 3.4)
+  world.hunters.push(s)
+  s.sickUntil = 0.05
+  let peak = 0
+  run(world, world.cfg.splitting.seconds + 0.3, w => { if (w.events.some(e => e.type === 'split-done')) peak = Math.max(peak, ...w.hunters.map(p => Math.hypot(p.vx, p.vy))) })
+  const pieces = world.hunters
+  assert.ok(pieces.length >= 2)
+  assert.ok(pieces.every(p => p.flare > 0.5), 'a flare of specks at the release')
+  assert.ok(peak > 8, `they spring apart (peak ${peak.toFixed(1)})`)
+  run(world, 1.5)
+  assert.ok(pieces.every(p => p.flare < 0.15 && Math.hypot(p.vx, p.vy) < 1.5), 'and are soon calm')
 })

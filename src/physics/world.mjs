@@ -95,8 +95,9 @@ export class World {
    * @param {number} h height, units
    * @param {number} r0 radius of a mass-1 hunter, units
    * @param {[number, number][]} corners points hunters keep away from
+   * @param {[number, number][]} [centres] the centre of each screen
    */
-  setSpace (w, h, r0, corners) {
+  setSpace (w, h, r0, corners, centres = []) {
     if (this.hunters.length > 0 && this.w > 0 && this.h > 0 && (w !== this.w || h !== this.h)) {
       // The area changed under living hunters (a window was resized, the character shape was measured):
       // everything keeps its place in it, instead of staying behind at the same coordinates.
@@ -109,6 +110,7 @@ export class World {
     this.h = h
     this.r0Target = r0
     if (this.hunters.length === 0) this.r0 = r0 // (with living hunters the size eases there, see `step`)
+    this.centres = centres      // the centre of each screen (a sick hunter drifts to the nearest one)
     this.corners = this.cfg.wrap ? [] : corners // with no walls there are no corners to keep away from
     if (this.hunters.length === 0) placeHunters(this)
   }

@@ -79,13 +79,20 @@ export const DEFAULTS = {
       },
       agitationUp: 4,       // how fast sickness takes hold of the movement and the edge (per second)
       agitationDown: 0.8,   // ...and how slowly it lets go, so a sick hunter calms down through the split
+      centring: {           // a sick hunter drifts to the centre of its nearest screen, so the burst is easy to see
+        speed: 6,           // top drifting speed (units/s)
+        pull: 0.4,          // slows down as it nears the centre: speed = distance * pull (per second)
+        accel: 40,          // strongest push (units/s^2)
+      },
       fromCookies: true,    // a hunter pushed over the sick mass by eating also gets sick
     },
     splitting: {
       loss: 0.25,           // share of the mass lost in a split
       sizeJitter: 0.2,      // the pieces differ in size by about +-20%
-      seconds: 2.2,         // how long a split takes (it is animated)
-      releaseSpeed: [0.3, 1], // small extra push when the pieces are released (they already move apart)
+      seconds: 4.5,         // how long a split takes (it is animated, in slow motion so you can follow it)
+      drag: 6,              // a hunter that is sick, bursting or just burst loses speed this fast (per second) and neither hunts nor is hunted
+      calmSeconds: 4,       // the pieces lie low this long after they part
+      releaseSpeed: [9, 13], // the pop: pieces spring apart at this speed when released (they brake at once, see `drag`, so it is brief) and stretch as they go
       neck: { high: 2.2, low2: 1.6, low3: 2.0 }, // neck thresholds while parting (higher = thinner)
     },
     hunting: {              // hunters are predators
@@ -185,6 +192,7 @@ export const DEFAULTS = {
         },
         mergeBurst: { radius: 1.0, density: 0.4 }, // a merge stirs the swarm: radius in hunter radii
         splitBurst: { radius: 1.3, density: 0.5 }, // a split stirs it more
+        splitRings: { steps: 6, width: 1.2, density: 0.45, pop: { reach: 3.2, width: 2, density: 0.6 } }, // a split also sends rings of flies out as the pieces part (`steps` of them), and a wide one (`pop`, radii) when they are released
       },
     },
     cookies: {

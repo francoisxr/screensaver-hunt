@@ -10,7 +10,7 @@ import { TAU } from '../core/math.mjs'
  * @returns {{ id: number, angle: number, speed: number } | null}
  */
 export function kickNextHunter (world) {
-  const bodies = world.bodies()
+  const bodies = world.bodies().filter(s => s.sickUntil === 0 && !s.anim && world.t >= s.calmUntil) // nobody lying low is shoved
   world.queue = world.queue.filter(id => bodies.some(s => s.id === id))
   if (world.queue.length === 0) world.queue = world.rng.shuffle(bodies.map(s => s.id))
   const id = world.queue.pop() // (taken once: popping inside the search would throw away a turn per hunter checked)

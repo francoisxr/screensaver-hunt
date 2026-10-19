@@ -37,8 +37,8 @@ Distances are in units (1 unit = one terminal row); masses are in base masses (1
 | `motion` | random drift, drag, top speed |
 | `kicks` | the shove one hunter gets every 10-20 s |
 | `merging` | the chance per bounce, the mass lost, how long the animation takes, the slime neck |
-| `sickness` | the mass above which a hunter gets sick, how long, how it moves, whether eating can make it sick |
-| `splitting` | the mass lost, piece size variation, the animation, the neck while parting |
+| `sickness` | the mass above which a hunter gets sick, how long, how it moves, whether eating can make it sick, and `centring`: a sick hunter drifts slowly to the centre of its nearest screen so the burst is easy to see |
+| `splitting` | the mass lost, piece size variation, the animation (`seconds`, slow motion by default), the neck while parting, and `drag`: a bursting hunter nearly stops and neither hunts nor is hunted |
 | `hunting` | the predator: steering strength, speed, the pounce, reaction time, rivals, being full. Its `stalk` part is hunters hunting each other (a hunter sticks with the prey it picked, starts with a `pounce`, and runs at `drive`, always harder than the `fleeDrive` of the prey, so chases are fast and long but end): how much bigger a hunter must be than its closest neighbour (`ratio`), how fast the prey runs (`fleeDrive`, always lower than the chaser's `drive`), the chance a catch merges (`catchChance`, 30%; otherwise the hunter bounces off a good distance (`bounce`, `recoil`) and the prey gets a short `boost`), and the `digest` pause after a merge |
 | `cookies` | how many, how often, how much mass, how long they last, where they appear, and how long (`slowSeconds`) and how much (`slowPace`, `slowDrag`) a hunter is slowed after eating one |
 

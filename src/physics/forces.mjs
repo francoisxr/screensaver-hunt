@@ -111,6 +111,35 @@ export function pace (world, s) {
   return 1 - (1 - world.cfg.cookies.slowPace) * clamp01(k)
 }
 
+/**
+ * A sick (or bursting) hunter drifts slowly to the centre of the screen nearest to it, so the burst happens
+ * where it can be seen and not in a corner. It slows down on arrival.
+ */
+export function applyCentring (world, s) {
+  const { centring } = world.cfg.sickness
+  let best = null
+  let nearest = Infinity
+  for (const c of world.centres ?? []) {
+    const d = Math.hypot(world.dx(c[0] - s.x), world.dy(c[1] - s.y))
+    if (d < nearest) { nearest = d; best = c }
+  }
+  if (!best || nearest < 1e-6) return
+  const speed = Math.min(centring.speed, nearest * centring.pull) // the speed it drifts at: slower the closer it gets
+  const drag = world.cfg.motion.drag + world.cfg.splitting.drag
+  const a = Math.min(centring.accel, speed * drag) // enough push to hold that speed against the braking
+  s.ax += world.dx(best[0] - s.x) / nearest * a
+  s.ay += world.dy(best[1] - s.y) / nearest * a
+}
+
+/** Whether a hunter is in the middle of bursting into pieces (see splitting.mjs). */
+export const exploding = s => s.anim?.type === 'split'
+
+/**
+ * Whether a hunter is lying low: sick (about to burst), bursting, or just after the burst. It brakes hard, does not
+ * hunt, flee or wander, and is left alone (see `canMerge`), so it is easy to follow.
+ */
+export const calm = (world, s) => s.sickUntil !== 0 || exploding(s) || world.t < s.calmUntil
+
 /** All the per-hunter forces, in the order they are applied. */
 export function applyBodyForces (world, bodies, dt) {
   for (const s of bodies) {
@@ -119,6 +148,8 @@ export function applyBodyForces (world, bodies, dt) {
       applyCorners(world, s)
       applyWalls(world, s)
     }
+    if (s.sickUntil !== 0 || exploding(s)) applyCentring(world, s)
+    if (calm(world, s)) continue // sick, bursting or just burst: no hunting, fleeing, wandering or jolts, just the walls
     const ax0 = s.ax
     const ay0 = s.ay
     let focus = stalkSteer(world, s, dt)
@@ -138,7 +169,8 @@ export function integrate (world, bodies, dt) {
   const { cookies } = world.cfg
   for (const s of bodies) {
     const k = pace(world, s)
-    const damp = Math.exp(-(motion.drag + cookies.slowDrag * (1 - k)) * dt) // a slowed hunter also loses speed faster
+    const drag = motion.drag + cookies.slowDrag * (1 - k) + (calm(world, s) ? world.cfg.splitting.drag : 0) // a slowed hunter also loses speed faster; a sick or bursting one nearly stops
+    const damp = Math.exp(-drag * dt)
     s.vx = (s.vx + s.ax * dt) * damp
     s.vy = (s.vy + s.ay * dt) * damp
     const top = motion.maxSpeed * (0.5 + 0.5 * k)

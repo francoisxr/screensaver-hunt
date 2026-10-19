@@ -18,6 +18,7 @@ const SPLIT_SCALE_RANGE = [0.002, 0.998] // outside this progress the scale is s
 const DRAWN_MASS_RATE = 6     // how fast a hunter's drawn size follows its mass when not animating (per second)
 const FUZZ_RATE = 2.5         // how fast the edge frays (per second); it settles back 2.5x slower
 const FUZZ_SETTLE = 0.4
+const FLARE_RATE = 1.6        // how fast a released piece's flare of specks dies away (per second)
 
 /** Advances every merge and split animation, and finishes the ones that are over. */
 export function updateAnimations (world) {
@@ -99,6 +100,7 @@ export function relaxVisuals (world, dt) {
   const relax = Math.min(1, dt * DRAWN_MASS_RATE)
   const fray = Math.min(1, dt * FUZZ_RATE)
   for (const s of world.hunters) {
+    s.flare *= Math.exp(-FLARE_RATE * dt)
     if (!s.anim) s.drawMass += (s.mass - s.drawMass) * relax
     const a = s.anim
     const frayed = s.sickUntil !== 0 || (a && a.type === 'merge' && a.willBeSick && a.keep === s)
