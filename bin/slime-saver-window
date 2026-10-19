@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Runs inside each screensaver window (started by `slime-saver`): hides the mouse cursor, shows this
+# monitor's slice of the scene (slime-saver-client) until a key press or loss of focus, then closes every
+# screensaver window and brings the cursor back.
+#
+# Usage: slime-saver-window <monitor-x> <monitor-name> <window-class>
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+CLASS="${3:-slime-saver}"
+
+set_cursor_hidden() { # true | false
+  hyprctl eval "hl.config({ cursor = { invisible = $1 } })" &>/dev/null || hyprctl keyword cursor:invisible "$1" &>/dev/null || true
+}
+
+restore() {
+  set_cursor_hidden false
+  pkill -f 'bin/slime-saver-scen[e]' 2>/dev/null
+  pkill -f -- "--app-id=$CLASS" 2>/dev/null
+}
+
+restored=0
+restore_once() {
+  ((restored)) && return
+  restored=1
+  restore
+}
+trap restore_once EXIT
+trap 'kill "$client_pid" 2>/dev/null; restore_once; exit 0' HUP TERM INT
+
+set_cursor_hidden true
+
+# The window opens at a default size before Hyprland makes it fullscreen: wait for the real size.
+for _ in $(seq 100); do
+  [[ $(stty size 2>/dev/null) != "24 80" ]] && break
+  sleep 0.02
+done
+
+node "$ROOT/bin/slime-saver-client" "$@" <&0 &
+client_pid=$!
+wait "$client_pid"

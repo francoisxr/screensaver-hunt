@@ -1,0 +1,36 @@
+{
+  "name": "screensaver-hunt",
+  "version": "0.1.0",
+  "description": "A terminal screensaver: slime-mold dishes that hunt cookies, merge, get sick and split across all your monitors. Runs unmodified play.core programs.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.15"
+  },
+  "bin": {
+    "slime-saver": "bin/slime-saver",
+    "play-term": "bin/play-term"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "fetch": "scripts/fetch-play-core.sh",
+    "install-local": "scripts/install.sh"
+  },
+  "keywords": [
+    "screensaver",
+    "terminal",
+    "ascii",
+    "physarum",
+    "play.core",
+    "hyprland"
+  ],
+  "license": "0BSD",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/francoisxr/screensaver-hunt.git"
+  },
+  "homepage": "https://github.com/francoisxr/screensaver-hunt#readme",
+  "bugs": {
+    "url": "https://github.com/francoisxr/screensaver-hunt/issues"
+  }
+}

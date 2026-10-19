@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+// The screensaver's scene process (started by `slime-saver`): runs the simulation and sends each
+// monitor window its slice. See src/saver/scene-main.mjs.
+import { main } from '../src/saver/scene-main.mjs'
+
+main().catch(e => {
+  console.error(e.message || e)
+  process.exit(1)
+})

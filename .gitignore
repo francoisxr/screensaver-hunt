@@ -1,0 +1,7 @@
+node_modules/
+# play.core and the programs we download from it are not ours to redistribute (see THIRD_PARTY.md).
+vendor/
+programs/*.js
+!programs/.gitkeep
+*.log
+.DS_Store

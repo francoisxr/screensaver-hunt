@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+// Runs a play.core program fullscreen in this terminal (https://play.ertdfgcvb.xyz).
+//
+//   play-term <program.js> [--any-key] [--aspect 0.5]
+//
+// Save the file and it reloads. Quit with q or Ctrl-C (any key with --any-key).
+
+import { resolve } from 'node:path'
+import { installPlayCoreHooks } from '../src/play/module-hooks.mjs'
+import { installBrowserShims } from '../src/play/browser-shims.mjs'
+import { runInTerminal } from '../src/play/terminal-runner.mjs'
+
+const args = process.argv.slice(2)
+const file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--aspect')
+if (!file || args.includes('--help')) {
+  console.error('usage: play-term <program.js> [--any-key] [--aspect 0.5]')
+  process.exit(file ? 0 : 1)
+}
+const aspectIndex = args.indexOf('--aspect')
+const aspect = aspectIndex >= 0 ? Number(args[aspectIndex + 1]) : 0.5
+
+installPlayCoreHooks()
+installBrowserShims()
+runInTerminal({ programPath: resolve(file), aspect, anyKeyExits: args.includes('--any-key') })

@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+// The display client, one per monitor window (started by `slime-saver-window`): prints the frames the
+// scene sends. See src/saver/client.mjs.
+//
+//   slime-saver-client <monitor-x> <monitor-name> [window-class]
+import { runClient } from '../src/saver/client.mjs'
+
+const [x, name, windowClass] = process.argv.slice(2)
+runClient({ x: Number(x) || 0, name: name || '', windowClass: windowClass || undefined })

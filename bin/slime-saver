@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+#
+# slime-saver: a fullscreen screensaver on every monitor (Hyprland + foot). Slime-mold dishes drift across
+# all your screens, hunt cookies, merge, get sick and split. A scene process (slime-saver-scene) runs the
+# simulation; one foot window per monitor shows its slice (slime-saver-window -> slime-saver-client).
+#
+# Usage: slime-saver [program.js]     (default: programs/slime_dish.js, see scripts/fetch-play-core.sh)
+#
+# Environment:
+#   SLIME_SAVER_WINDOW_CLASS  app id of the windows (default: org.omarchy.screensaver on Omarchy, so its
+#                             idle handling treats them as its own screensaver; slime-saver elsewhere)
+#   SLIME_SAVER_FOOT_CONFIG   foot config for the windows (default: Omarchy's screensaver one if present,
+#                             else share/foot-screensaver.ini)
+#   SLIME_SAVER_DEBUG=1       log to $XDG_RUNTIME_DIR/slime-saver.log
+#   (more settings: docs/configuration.md)
+
+set -u
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PROGRAM="${1:-$ROOT/programs/slime_dish.js}"
+
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then
+  sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  exit 0
+fi
+
+die() {
+  echo "slime-saver: $*" >&2
+  command -v notify-send >/dev/null && notify-send -a slime-saver "slime-saver" "$*"
+  exit 1
+}
+
+for tool in node foot hyprctl jq socat; do
+  command -v "$tool" >/dev/null || die "'$tool' is required but was not found"
+done
+[[ -f $PROGRAM ]] || die "program not found: $PROGRAM (run scripts/fetch-play-core.sh to download slime_dish)"
+
+# Omarchy, if this is one (the idle timer starts us from a shell that may not have OMARCHY_PATH set).
+OMARCHY="${OMARCHY_PATH:-}"
+[[ -z $OMARCHY && -d /usr/share/omarchy ]] && OMARCHY=/usr/share/omarchy
+
+if [[ -n ${SLIME_SAVER_WINDOW_CLASS:-} ]]; then
+  CLASS="$SLIME_SAVER_WINDOW_CLASS"
+elif [[ -n $OMARCHY ]]; then
+  CLASS="org.omarchy.screensaver"
+else
+  CLASS="slime-saver"
+fi
+
+if [[ -n ${SLIME_SAVER_FOOT_CONFIG:-} ]]; then
+  FOOT_CONFIG="$SLIME_SAVER_FOOT_CONFIG"
+elif [[ -n $OMARCHY && -f $OMARCHY/default/foot/screensaver.ini ]]; then
+  FOOT_CONFIG="$OMARCHY/default/foot/screensaver.ini"
+else
+  FOOT_CONFIG="$ROOT/share/foot-screensaver.ini"
+fi
+
+# Already running? Then do nothing.
+pgrep -f -- "--app-id=$CLASS" >/dev/null && exit 0
+
+focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
+
+hypr_focus_monitor() {
+  hyprctl dispatch "hl.dsp.focus({ monitor = \"$1\" })" >/dev/null 2>&1 || hyprctl dispatch focusmonitor "$1" >/dev/null
+}
+
+# Runs a command through Hyprland, so the new window opens on the monitor that has focus.
+hypr_exec() {
+  local command
+  printf -v command '%q ' "$@"
+  hyprctl dispatch "hl.dsp.exec_cmd([[$command]])" >/dev/null 2>&1 || hyprctl dispatch exec -- bash -lc "$command" >/dev/null
+}
+
+# Monitors, left to right.
+mapfile -t monitors < <(hyprctl monitors -j | jq -r 'sort_by(.x) | .[] | "\(.name) \(.x)"')
+
+# The scene process (replacing any left over from an earlier run).
+pkill -f 'bin/slime-saver-scen[e]' 2>/dev/null
+setsid -f node "$ROOT/bin/slime-saver-scene" "$PROGRAM" --expect "${#monitors[@]}" >/dev/null 2>&1
+
+# One window per monitor; wait for each to open before moving on.
+exec {events}< <(socat -U - "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" 2>/dev/null)
+
+wait_for_window() {
+  local line deadline=$((SECONDS + 5))
+  while ((SECONDS < deadline)) && IFS= read -r -t $((deadline - SECONDS)) -u "$events" line; do
+    [[ $line == openwindow\>\>*,"$CLASS",* ]] && return 0
+  done
+}
+
+for entry in "${monitors[@]}"; do
+  read -r name x <<<"$entry"
+  hypr_focus_monitor "$name"
+  hypr_exec foot --app-id="$CLASS" --config="$FOOT_CONFIG" -e "$ROOT/bin/slime-saver-window" "$x" "$name" "$CLASS"
+  wait_for_window
+done
+
+hypr_focus_monitor "$focused"
